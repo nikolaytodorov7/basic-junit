@@ -1,5 +1,6 @@
 package test;
 
+import api.annotations.RepeatedTest;
 import api.annotations.Test;
 
 import static api.asserts.Assertions.*;
@@ -24,10 +25,11 @@ public class CupTest {
         assertEquals("Watera", c.getLiquidType()); //failing test
     }
 
+    @RepeatedTest(5)
     @Test
     void setPercentageFull() {
         Cup c = new Cup("Orange Juice", 85.5);
         c.setPercentFull(65.5);
-        assertEquals(65.5, c.getPercentFull());
+        assertEquals(65.5, c.getPercentFull(), () -> "Example message with lambda");
     }
 }

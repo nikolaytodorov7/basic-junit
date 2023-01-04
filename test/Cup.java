@@ -4,6 +4,9 @@ public class Cup {
     private String liquidType;
     private double percentFull;
 
+    public Cup() {
+    }
+
     public Cup(String liquidType, double percentFull) {
         this.liquidType = liquidType;
         this.percentFull = percentFull;
