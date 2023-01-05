@@ -3,10 +3,13 @@ package api.asserts;
 import api.annotations.function.Executable;
 import api.annotations.function.ThrowingSupplier;
 import api.errors.AssertionFailedError;
+import api.errors.MultipleFailuresError;
+import api.exceptions.PreconditionViolationException;
 
 import java.time.Duration;
 import java.util.*;
 import java.util.function.Supplier;
+import java.util.stream.Stream;
 
 import static api.asserts.AssertionUtils.*;
 
@@ -345,5 +348,70 @@ public class Assertions {
 
         int purgedTask = timer.purge();
         return purgedTask == 0 ? result : null;
+    }
+
+    public static void assertAll(Executable... executables) throws MultipleFailuresError {
+        assertAll(null, executables);
+    }
+
+    public static void assertAll(String heading, Executable... executables) throws MultipleFailuresError {
+        if (executables == null || executables.length == 0)
+            throw new PreconditionViolationException("executables array must not be null or empty");
+
+        Arrays.stream(executables).forEach((object) -> {
+            if (object == null)
+                throw new PreconditionViolationException("individual executables must not be null");
+        });
+
+        assertAll(heading, Arrays.stream(executables));
+    }
+
+    public static void assertAll(Collection<Executable> executables) throws MultipleFailuresError {
+        assertAll(null, executables);
+    }
+
+    public static void assertAll(String heading, Collection<Executable> executables) throws MultipleFailuresError {
+        if (executables == null)
+            throw new PreconditionViolationException("executables collection must not be null");
+
+        executables.forEach((object) -> {
+            if (object == null)
+                throw new PreconditionViolationException("individual executables must not be null");
+        });
+
+        assertAll(heading, executables.stream());
+    }
+
+    public static void assertAll(Stream<Executable> executables) throws MultipleFailuresError {
+        assertAll(null, executables);
+    }
+
+    public static void assertAll(String heading, Stream<Executable> executables) throws MultipleFailuresError {
+        if (executables == null)
+            throw new PreconditionViolationException("executables stream must not be null");
+
+        List<Throwable> failures = getFailures(executables);
+
+        if (!failures.isEmpty()) {
+            MultipleFailuresError multipleFailuresError = new MultipleFailuresError(heading, failures);
+            failures.forEach(multipleFailuresError::addSuppressed);
+            throw multipleFailuresError;
+        }
+    }
+
+    private static List<Throwable> getFailures(Stream<Executable> executables) {
+        return executables.map((executable) -> {
+                    if (executable == null)
+                        throw new PreconditionViolationException("individual executables must not be null");
+
+                    try {
+                        executable.execute();
+                        return null;
+                    } catch (Throwable throwable) {
+                        return throwable;
+                    }
+                })
+                .filter(Objects::nonNull)
+                .toList();
     }
 }

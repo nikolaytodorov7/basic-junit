@@ -75,7 +75,6 @@ public class MethodExecutor {
         for (int i = 0; i < repeatCount; i++) {
             method.invoke(classInstance);
         }
-
     }
 
     private void testMethodsInOrder() throws IllegalAccessException, InvocationTargetException {
