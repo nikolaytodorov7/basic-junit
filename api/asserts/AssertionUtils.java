@@ -1,5 +1,7 @@
 package api.asserts;
 
+import api.errors.AssertionFailedError;
+
 import java.util.Arrays;
 import java.util.function.Supplier;
 
