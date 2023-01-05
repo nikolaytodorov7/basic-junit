@@ -1,101 +1,92 @@
 package api;
 
 import api.annotations.*;
+import api.exceptions.JUnitException;
 
 import java.lang.annotation.Annotation;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
 
 public class MethodExecutor {
-    private Map<Method, Integer> beforeAllMethods = new HashMap<>();
-    private Map<Method, Integer> beforeEachMethods = new HashMap<>();
-    private Map<Method, Integer> testMethods = new HashMap<>();
-    private Map<Method, Integer> afterAllMethods = new HashMap<>();
-    private Map<Method, Integer> afterEachMethods = new HashMap<>();
-    private Class<?> clazz;
+    private List<TestMethod> beforeAllMethods = new ArrayList<>();
+    private List<TestMethod> beforeEachMethods = new ArrayList<>();
+    private List<TestMethod> testMethods = new ArrayList<>();
+    private List<TestMethod> afterAllMethods = new ArrayList<>();
+    private List<TestMethod> afterEachMethods = new ArrayList<>();
     private Object classInstance;
 
-
-    public MethodExecutor(Class<?> clazz) {
-        this.clazz = clazz;
+    public MethodExecutor(Class<?> clazz) throws JUnitException {
         try {
             classInstance = clazz.getDeclaredConstructor().newInstance();
         } catch (Exception e) {
             throw new RuntimeException("No default constructor in class: " + clazz.getName());
         }
+
+        extractMethods(clazz);
     }
 
     public void testMethods() throws Exception {
-        extractMethods(clazz);
-        testMethodsInOrder();
+        for (TestMethod method : beforeAllMethods) {
+            method.runMethodTest();
+        }
+
+        for (TestMethod testMethod : testMethods) {
+            for (TestMethod method : beforeEachMethods) {
+                method.runMethodTest();
+            }
+
+            testMethod.runMethodTest();
+
+            for (TestMethod method : afterEachMethods) {
+                method.runMethodTest();
+            }
+        }
+
+        for (TestMethod method : afterAllMethods) {
+            method.runMethodTest();
+        }
     }
 
-    private void extractMethods(Class<?> clazz) {
+    private void extractMethods(Class<?> clazz) throws JUnitException {
         Method[] methods = clazz.getDeclaredMethods();
         for (Method method : methods) {
             method.setAccessible(true);
-            int repeatCount = 1;
-            RepeatedTest repeatedTest = method.getDeclaredAnnotation(RepeatedTest.class);
-            if (repeatedTest != null) {
-                validateRepeatedTest(method);
-                repeatCount = repeatedTest.value();
-            }
+            TestMethod testMethod = new TestMethod(method, classInstance);
 
             Annotation[] annotations = method.getDeclaredAnnotations();
             for (Annotation annotation : annotations) {
                 if (annotation instanceof Test)
-                    testMethods.put(method, repeatCount);
+                    storeMethod(testMethod, testMethods);
                 else if (annotation instanceof BeforeAll)
-                    beforeAllMethods.put(method, repeatCount);
+                    storeMethod(testMethod, beforeAllMethods, "BeforeAll");
                 else if (annotation instanceof BeforeEach)
-                    beforeEachMethods.put(method, repeatCount);
+                    storeMethod(testMethod, beforeEachMethods, "BeforeEach");
                 else if (annotation instanceof AfterAll)
-                    afterAllMethods.put(method, repeatCount);
+                    storeMethod(testMethod, afterAllMethods, "AfterAll");
                 else if (annotation instanceof AfterEach)
-                    afterEachMethods.put(method, repeatCount);
+                    storeMethod(testMethod, afterEachMethods, "AfterEach");
             }
         }
     }
 
-    private void validateRepeatedTest(Method method) {
-        Class<?> returnType = method.getReturnType();
-        if (!returnType.getName().equals("void"))
-            throw new RuntimeException("The return type of the method annotated with @RepeatedTest must be void only!");
-
-        if (Modifier.isStatic(method.getModifiers()))
-            throw new RuntimeException("Method annotated with @RepeatedTest cannot be static!");
+    private void storeMethod(TestMethod testMethod, List<TestMethod> methodsList) {
+        methodsList.add(testMethod);
     }
 
-    private void testMethod(Map.Entry<Method, Integer> entryMethodRepeat) throws InvocationTargetException, IllegalAccessException {
-        Method method = entryMethodRepeat.getKey();
-        int repeatCount = entryMethodRepeat.getValue();
-        for (int i = 0; i < repeatCount; i++) {
-            method.invoke(classInstance);
-        }
+    private void storeMethod(TestMethod testMethod, List<TestMethod> methodsList, String annotation) throws JUnitException {
+        if (!isStaticMethod(testMethod.method))
+            throw new JUnitException(buildErrorMessage(annotation, testMethod.method));
+
+        methodsList.add(testMethod);
     }
 
-    private void testMethodsInOrder() throws IllegalAccessException, InvocationTargetException {
-        for (Map.Entry<Method, Integer> beforeAllMethodsEntry : beforeAllMethods.entrySet()) {
-            testMethod(beforeAllMethodsEntry);
-        }
+    private String buildErrorMessage(String annotation, Method method) {
+        return String.format("@%s method '%s' must be static.", annotation, method);
+    }
 
-        for (Map.Entry<Method, Integer> testMethodsEntry : testMethods.entrySet()) {
-            for (Map.Entry<Method, Integer> beforeEachMethodsEntry : beforeEachMethods.entrySet()) {
-                testMethod(beforeEachMethodsEntry);
-            }
-
-            testMethod(testMethodsEntry);
-
-            for (Map.Entry<Method, Integer> afterEachMethodsEntry : afterEachMethods.entrySet()) {
-                testMethod(afterEachMethodsEntry);
-            }
-        }
-
-        for (Map.Entry<Method, Integer> afterAllMethodsEntry : afterAllMethods.entrySet()) {
-            testMethod(afterAllMethodsEntry);
-        }
+    private boolean isStaticMethod(Method method) {
+        return Modifier.isStatic(method.getModifiers());
     }
 }
