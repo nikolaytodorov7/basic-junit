@@ -15,60 +15,72 @@ public class MethodExecutor {
     private List<TestMethod> testMethods = new ArrayList<>();
     private List<TestMethod> afterAllMethods = new ArrayList<>();
     private List<TestMethod> afterEachMethods = new ArrayList<>();
-    private Object classInstance;
+    private List<Throwable> throwableList = new ArrayList<>();
+    private Class<?> clazz;
 
     public MethodExecutor(Class<?> clazz) throws JUnitException {
-        try {
-            classInstance = clazz.getDeclaredConstructor().newInstance();
-        } catch (Exception e) {
-            throw new RuntimeException("No default constructor in class: " + clazz.getName());
-        }
-
+        this.clazz = clazz;
         extractMethods(clazz);
     }
 
-    public void testMethods() throws Exception {
+    public void executeMethods() throws Exception {
+        System.out.printf("| +-- %s\n", clazz.getSimpleName());
+
         for (TestMethod method : beforeAllMethods) {
-            method.runMethodTest();
+            executeMethod(method);
         }
 
         for (TestMethod testMethod : testMethods) {
             for (TestMethod method : beforeEachMethods) {
-                method.runMethodTest();
+                executeMethod(method);
             }
 
-            testMethod.runMethodTest();
+            executeMethod(testMethod);
 
             for (TestMethod method : afterEachMethods) {
-                method.runMethodTest();
+                executeMethod(method);
             }
         }
 
         for (TestMethod method : afterAllMethods) {
-            method.runMethodTest();
+            executeMethod(method);
         }
+
+        System.out.printf("Failures(%d):\n", throwableList.size());
+        for (Throwable t : throwableList)
+            t.printStackTrace();
+    }
+
+    private void executeMethod(TestMethod method) throws Exception {
+        Throwable throwable = method.runTest();
+        if (throwable != null)
+            throwableList.add(throwable);
     }
 
     private void extractMethods(Class<?> clazz) throws JUnitException {
         Method[] methods = clazz.getDeclaredMethods();
         for (Method method : methods) {
             method.setAccessible(true);
-            TestMethod testMethod = new TestMethod(method, classInstance);
+            TestMethod testMethod = new TestMethod(method, clazz);
 
             Annotation[] annotations = method.getDeclaredAnnotations();
             for (Annotation annotation : annotations) {
-                if (annotation instanceof Test)
-                    storeMethod(testMethod, testMethods);
-                else if (annotation instanceof BeforeAll)
-                    storeMethod(testMethod, beforeAllMethods, "BeforeAll");
-                else if (annotation instanceof BeforeEach)
-                    storeMethod(testMethod, beforeEachMethods, "BeforeEach");
-                else if (annotation instanceof AfterAll)
-                    storeMethod(testMethod, afterAllMethods, "AfterAll");
-                else if (annotation instanceof AfterEach)
-                    storeMethod(testMethod, afterEachMethods, "AfterEach");
+                processAnnotation(testMethod, annotation);
             }
         }
+    }
+
+    private void processAnnotation(TestMethod testMethod, Annotation annotation) throws JUnitException {
+        if (annotation instanceof Test)
+            storeMethod(testMethod, testMethods);
+        else if (annotation instanceof BeforeAll)
+            storeMethod(testMethod, beforeAllMethods, "BeforeAll");
+        else if (annotation instanceof BeforeEach)
+            storeMethod(testMethod, beforeEachMethods, "BeforeEach");
+        else if (annotation instanceof AfterAll)
+            storeMethod(testMethod, afterAllMethods, "AfterAll");
+        else if (annotation instanceof AfterEach)
+            storeMethod(testMethod, afterEachMethods, "AfterEach");
     }
 
     private void storeMethod(TestMethod testMethod, List<TestMethod> methodsList) {

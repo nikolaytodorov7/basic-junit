@@ -7,24 +7,12 @@ import java.util.function.Supplier;
 
 public class AssertionUtils {
     static void failNotEqual(Object expected, Object actual, String message) {
-        fail(buildMessage(expected, actual, message));
+        String msg = buildMessage(expected, actual, message);
+        throw new AssertionFailedError(msg);
     }
 
-    static void failNotEqual(Object expected, Object actual, Supplier<String> messageSupplier) {
-        fail(buildMessage(expected, actual, messageSupplier != null ? messageSupplier.get() : null));
-    }
-
-    static void fail(String message) {
-        throw new AssertionFailedError(message);
-    }
-
-    private static String toString(Object obj) {
-        return obj instanceof Class ? getCanonicalName((Class<?>) obj) : nullSafeToString(obj);
-    }
-
-    static String getCanonicalName(Class<?> clazz) {
-        String canonicalName = clazz.getCanonicalName();
-        return canonicalName != null ? canonicalName : clazz.getName();
+    static String getSupplierMessage(Supplier<String> messageSupplier) {
+        return messageSupplier != null ? messageSupplier.get() : null;
     }
 
     static boolean floatsAreEqual(float value1, float value2) {
@@ -46,24 +34,10 @@ public class AssertionUtils {
     }
 
     static void assertValidDelta(double delta) {
-        if (Double.isNaN(delta) || delta < 0.0)
-            failIllegalDelta(String.valueOf(delta));
-    }
-
-    private static void failIllegalDelta(String delta) {
-        fail(String.format("positive delta expected but was: <%s>", delta));
-    }
-
-    static void failNotNull(Object actual, String message) {
-        String stringRepresentation = actual.toString();
-        if (stringRepresentation != null && !stringRepresentation.equals("null"))
-            fail(buildMessage(null, actual, message));
-        else
-            fail(buildMessage(null, actual, message));
-    }
-
-    static void failNull(String message) {
-        Assertions.fail(buildPrefix(message) + "expected: not <null>");
+        if (Double.isNaN(delta) || delta < 0.0) {
+            String msg = String.format("positive delta expected but was: <%s>", delta);
+            throw new AssertionFailedError(msg);
+        }
     }
 
     public static String buildPrefix(String message) {
@@ -80,6 +54,15 @@ public class AssertionUtils {
 
         messageBuilder.append(formattedValues);
         return messageBuilder.toString();
+    }
+
+    private static String toString(Object obj) {
+        return obj instanceof Class ? getCanonicalName((Class<?>) obj) : nullSafeToString(obj);
+    }
+
+    static String getCanonicalName(Class<?> clazz) {
+        String canonicalName = clazz.getCanonicalName();
+        return canonicalName != null ? canonicalName : clazz.getName();
     }
 
     static String nullSafeGet(Object messageOrSupplier) {

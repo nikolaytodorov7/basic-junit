@@ -7,15 +7,28 @@ import java.net.URLClassLoader;
 
 public class JUnit {
     public static void main(String[] args) throws Exception {
-        try (URLClassLoader loader = createClassLoader(args[0])) {
-            File file = new File(args[0]);
+        createLoader(args[0]);
+    }
+
+    private static void createLoader(String args) throws Exception {
+        try (URLClassLoader loader = createClassLoader(args)) {
+            File file = new File(args);
             File[] files = file.listFiles();
             if (files == null || files.length == 0)
                 return;
 
-            for (File classFile : files) {
-                testClass(loader, classFile);
-            }
+            findTestClasses(loader, files);
+        }
+    }
+
+    private static void findTestClasses(URLClassLoader loader, File[] files) throws Exception {
+        for (File classFile : files) {
+            if (classFile.isFile())
+                if (classFile.isFile() && classFile.getName().endsWith(".java"))
+                    testClass(loader, classFile);
+
+            if (classFile.isDirectory())
+                createLoader(classFile.toString());
         }
     }
 
@@ -30,6 +43,6 @@ public class JUnit {
         fileName = fileName.split(".java")[0];
         Class<?> clazz = loader.loadClass("test." + fileName);
         MethodExecutor methodExecutor = new MethodExecutor(clazz);
-        methodExecutor.testMethods();
+        methodExecutor.executeMethods();
     }
 }

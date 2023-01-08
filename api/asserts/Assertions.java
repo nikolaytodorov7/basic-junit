@@ -8,17 +8,13 @@ import api.exceptions.PreconditionViolationException;
 
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.*;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 import static api.asserts.AssertionUtils.*;
 
 public class Assertions {
-    public static <V> V fail(String message) {
-        AssertionUtils.fail(message);
-        return null;
-    }
-
     public static void assertEquals(byte expected, byte actual) {
         assertEquals(expected, actual, (String) null);
     }
@@ -29,8 +25,7 @@ public class Assertions {
     }
 
     public static void assertEquals(byte expected, byte actual, Supplier<String> messageSupplier) {
-        if (expected != actual)
-            failNotEqual(expected, actual, messageSupplier);
+        assertEquals(expected, actual, getSupplierMessage(messageSupplier));
     }
 
     public static void assertEquals(short expected, short actual) {
@@ -43,8 +38,7 @@ public class Assertions {
     }
 
     public static void assertEquals(short expected, short actual, Supplier<String> messageSupplier) {
-        if (expected != actual)
-            failNotEqual(expected, actual, messageSupplier);
+        assertEquals(expected, actual, getSupplierMessage(messageSupplier));
     }
 
     public static void assertEquals(int expected, int actual) {
@@ -57,8 +51,7 @@ public class Assertions {
     }
 
     public static void assertEquals(int expected, int actual, Supplier<String> messageSupplier) {
-        if (expected != actual)
-            failNotEqual(expected, actual, messageSupplier);
+        assertEquals(expected, actual, getSupplierMessage(messageSupplier));
     }
 
     public static void assertEquals(long expected, long actual) {
@@ -71,8 +64,7 @@ public class Assertions {
     }
 
     public static void assertEquals(long expected, long actual, Supplier<String> messageSupplier) {
-        if (expected != actual)
-            failNotEqual(expected, actual, messageSupplier);
+        assertEquals(expected, actual, getSupplierMessage(messageSupplier));
     }
 
     public static void assertEquals(float expected, float actual) {
@@ -85,8 +77,7 @@ public class Assertions {
     }
 
     public static void assertEquals(float expected, float actual, Supplier<String> messageSupplier) {
-        if (!floatsAreEqual(expected, actual))
-            failNotEqual(expected, actual, messageSupplier);
+        assertEquals(expected, actual, getSupplierMessage(messageSupplier));
     }
 
     public static void assertEquals(float expected, float actual, float delta) {
@@ -99,8 +90,7 @@ public class Assertions {
     }
 
     public static void assertEquals(float expected, float actual, float delta, Supplier<String> messageSupplier) {
-        if (!floatsAreEqual(expected, actual, delta))
-            failNotEqual(expected, actual, messageSupplier);
+        assertEquals(expected, actual, delta, getSupplierMessage(messageSupplier));
     }
 
     public static void assertEquals(double expected, double actual) {
@@ -113,8 +103,7 @@ public class Assertions {
     }
 
     public static void assertEquals(double expected, double actual, Supplier<String> messageSupplier) {
-        if (!doublesAreEqual(expected, actual))
-            failNotEqual(expected, actual, messageSupplier);
+        assertEquals(expected, actual, getSupplierMessage(messageSupplier));
     }
 
     public static void assertEquals(double expected, double actual, double delta) {
@@ -128,8 +117,7 @@ public class Assertions {
     }
 
     public static void assertEquals(double expected, double actual, double delta, Supplier<String> messageSupplier) {
-        if (!doublesAreEqual(expected, actual, delta))
-            failNotEqual(expected, actual, messageSupplier);
+        assertEquals(expected, actual, delta, getSupplierMessage(messageSupplier));
     }
 
     public static void assertEquals(char expected, char actual) {
@@ -142,8 +130,7 @@ public class Assertions {
     }
 
     public static void assertEquals(char expected, char actual, Supplier<String> messageSupplier) {
-        if (expected != actual)
-            failNotEqual(expected, actual, messageSupplier);
+        assertEquals(expected, actual, getSupplierMessage(messageSupplier));
     }
 
     public static void assertEquals(String expected, String actual) {
@@ -156,8 +143,7 @@ public class Assertions {
     }
 
     public static void assertEquals(String expected, String actual, Supplier<String> messageSupplier) {
-        if (!Objects.equals(expected, actual))
-            failNotEqual(expected, actual, messageSupplier);
+        assertEquals(expected, actual, getSupplierMessage(messageSupplier));
     }
 
     public static void assertTrue(boolean condition) {
@@ -167,13 +153,12 @@ public class Assertions {
     public static void assertTrue(boolean condition, String message) {
         if (!condition) {
             String msg = String.format(buildMessage(true, false, message));
-            fail(msg);
+            throw new AssertionFailedError(msg);
         }
     }
 
     public static void assertTrue(boolean condition, Supplier<String> messageSupplier) {
-        if (!condition)
-            fail(buildMessage(true, false, messageSupplier != null ? messageSupplier.get() : null));
+        assertTrue(condition, getSupplierMessage(messageSupplier));
     }
 
     public static void assertFalse(boolean condition) {
@@ -181,13 +166,15 @@ public class Assertions {
     }
 
     public static void assertFalse(boolean condition, String message) {
-        if (condition)
-            fail(buildMessage(false, true, message));
+        if (!condition)
+            return;
+
+        String msg = buildMessage(false, true, message);
+        throw new AssertionFailedError(msg);
     }
 
     public static void assertFalse(boolean condition, Supplier<String> messageSupplier) {
-        if (condition)
-            fail(buildMessage(false, true, messageSupplier != null ? messageSupplier.get() : null));
+        assertFalse(condition, getSupplierMessage(messageSupplier));
     }
 
     public static void assertNull(Object actual) {
@@ -195,13 +182,18 @@ public class Assertions {
     }
 
     public static void assertNull(Object actual, String message) {
-        if (actual != null)
-            failNotNull(actual, message);
+        if (actual == null)
+            return;
+
+        String stringRepresentation = actual.toString();
+        if (stringRepresentation != null && !stringRepresentation.equals("null")) {
+            String msg = buildMessage(null, actual, message);
+            throw new AssertionFailedError(msg);
+        }
     }
 
     public static void assertNull(Object actual, Supplier<String> messageSupplier) {
-        if (actual != null)
-            failNotNull(actual, messageSupplier != null ? messageSupplier.get() : null);
+        assertNull(actual, getSupplierMessage(messageSupplier));
     }
 
     public static void assertNotNull(Object actual) {
@@ -209,28 +201,33 @@ public class Assertions {
     }
 
     public static void assertNotNull(Object actual, String message) {
-        if (actual == null)
-            failNull(message);
+        if (actual != null)
+            return;
+
+        String msg = buildPrefix(message) + "expected: not <null>";
+        throw new AssertionFailedError(msg);
     }
 
     public static void assertNotNull(Object actual, Supplier<String> messageSupplier) {
-        if (actual == null)
-            failNull(messageSupplier != null ? messageSupplier.get() : null);
+        assertNotNull(actual, getSupplierMessage(messageSupplier));
     }
 
     public static <T extends Throwable> T assertThrows(Class<T> expectedType, Executable executable) {
         return assertThrows(expectedType, executable, (Object) null);
     }
 
-    public static <T extends Throwable> T assertThrows(Class<T> expectedType, Executable executable, String message) {
+    public static <T extends Throwable> T
+    assertThrows(Class<T> expectedType, Executable executable, String message) {
         return assertThrows(expectedType, executable, (Object) message);
     }
 
-    public static <T extends Throwable> T assertThrows(Class<T> expectedType, Executable executable, Supplier<String> messageSupplier) {
+    public static <T extends Throwable> T
+    assertThrows(Class<T> expectedType, Executable executable, Supplier<String> messageSupplier) {
         return assertThrows(expectedType, executable, (Object) messageSupplier);
     }
 
-    private static <T extends Throwable> T assertThrows(Class<T> expectedType, Executable executable, Object messageOrSupplier) {
+    private static <T extends Throwable> T
+    assertThrows(Class<T> expectedType, Executable executable, Object messageOrSupplier) {
         try {
             executable.execute();
         } catch (Throwable throwable) {
@@ -273,7 +270,8 @@ public class Assertions {
         return assertTimeout(timeout, supplier, (Object) message);
     }
 
-    public static <T> T assertTimeout(Duration timeout, ThrowingSupplier<T> supplier, Supplier<String> messageSupplier) {
+    public static <T> T
+    assertTimeout(Duration timeout, ThrowingSupplier<T> supplier, Supplier<String> messageSupplier) {
         return assertTimeout(timeout, supplier, (Object) messageSupplier);
     }
 
@@ -291,7 +289,7 @@ public class Assertions {
         if (timeElapsed > timeoutInMillis) {
             String prefix = buildPrefix(nullSafeGet(messageOrSupplier));
             String message = String.format("execution exceeded timeout of %s ms by %s ms", timeoutInMillis, timeElapsed - timeoutInMillis);
-            fail(prefix + message);
+            throw new AssertionFailedError(prefix + message);
         }
 
         return result;
@@ -308,7 +306,8 @@ public class Assertions {
         }, message);
     }
 
-    public static void assertTimeoutPreemptively(Duration timeout, Executable executable, Supplier<String> messageSupplier) {
+    public static void assertTimeoutPreemptively(Duration timeout, Executable
+            executable, Supplier<String> messageSupplier) {
         assertTimeoutPreemptively(timeout, () -> {
             executable.execute();
             return null;
@@ -319,35 +318,37 @@ public class Assertions {
         return assertTimeoutPreemptively(timeout, supplier, (Object) null);
     }
 
-    public static <T> T assertTimeoutPreemptively(Duration timeout, ThrowingSupplier<T> supplier, String message) {
+    public static <T> T
+    assertTimeoutPreemptively(Duration timeout, ThrowingSupplier<T> supplier, String message) {
         return assertTimeoutPreemptively(timeout, supplier, (Object) message);
     }
 
-    public static <T> T assertTimeoutPreemptively(Duration timeout, ThrowingSupplier<T> supplier, Supplier<String> messageSupplier) {
+    public static <T> T
+    assertTimeoutPreemptively(Duration timeout, ThrowingSupplier<T> supplier, Supplier<String> messageSupplier) {
         return assertTimeoutPreemptively(timeout, supplier, (Object) messageSupplier);
     }
 
-    private static <T> T assertTimeoutPreemptively(Duration timeout, ThrowingSupplier<T> supplier, Object messageOrSupplier) {
-        long timeoutInMillis = timeout.toMillis();
-        Timer timer = new Timer();
-        TimerTask timerTask = new TimerTask() {
-            public void run() {
-                String prefix = buildPrefix(nullSafeGet(messageOrSupplier));
-                String message = String.format("execution timeout of %s ms has passed.", timeoutInMillis);
-                fail(prefix + message);
-            }
-        };
-        timer.schedule(timerTask, timeoutInMillis);
-
-        T result = null;
-        try {
-            result = supplier.get();
-        } catch (Throwable throwable) {
+    private static <T> T
+    assertTimeoutPreemptively(Duration timeout, ThrowingSupplier<T> supplier, Object messageOrSupplier) {
+        T[] arr = (T[]) new Object[1];
+        try (ExecutorService pool = Executors.newSingleThreadExecutor()) {
+            Future<Boolean> future = pool.submit(() -> {
+                try {
+                    arr[0] = supplier.get();
+                } catch (Throwable throwable) {
 //            throw throwable; //todo throw throwable without unhandled
+                }
+            }, true);
+
+            future.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
+            pool.shutdownNow();
+        } catch (Exception e) {
+            String prefix = buildPrefix(nullSafeGet(messageOrSupplier));
+            String message = String.format("execution timeout of %s ms has passed.", timeout.toMillis());
+            throw new AssertionFailedError(prefix + message);
         }
 
-        int purgedTask = timer.purge();
-        return purgedTask == 0 ? result : null;
+        return arr[0];
     }
 
     public static void assertAll(Executable... executables) throws MultipleFailuresError {
@@ -370,7 +371,8 @@ public class Assertions {
         assertAll(null, executables);
     }
 
-    public static void assertAll(String heading, Collection<Executable> executables) throws MultipleFailuresError {
+    public static void assertAll(String heading, Collection<Executable> executables) throws
+            MultipleFailuresError {
         if (executables == null)
             throw new PreconditionViolationException("executables collection must not be null");
 
