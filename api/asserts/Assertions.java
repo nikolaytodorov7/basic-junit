@@ -7,8 +7,14 @@ import api.errors.MultipleFailuresError;
 import api.exceptions.PreconditionViolationException;
 
 import java.time.Duration;
-import java.util.*;
-import java.util.concurrent.*;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.List;
+import java.util.Objects;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
@@ -270,8 +276,7 @@ public class Assertions {
         return assertTimeout(timeout, supplier, (Object) message);
     }
 
-    public static <T> T
-    assertTimeout(Duration timeout, ThrowingSupplier<T> supplier, Supplier<String> messageSupplier) {
+    public static <T> T assertTimeout(Duration timeout, ThrowingSupplier<T> supplier, Supplier<String> messageSupplier) {
         return assertTimeout(timeout, supplier, (Object) messageSupplier);
     }
 
@@ -323,13 +328,11 @@ public class Assertions {
         return assertTimeoutPreemptively(timeout, supplier, (Object) message);
     }
 
-    public static <T> T
-    assertTimeoutPreemptively(Duration timeout, ThrowingSupplier<T> supplier, Supplier<String> messageSupplier) {
+    public static <T> T assertTimeoutPreemptively(Duration timeout, ThrowingSupplier<T> supplier, Supplier<String> messageSupplier) {
         return assertTimeoutPreemptively(timeout, supplier, (Object) messageSupplier);
     }
 
-    private static <T> T
-    assertTimeoutPreemptively(Duration timeout, ThrowingSupplier<T> supplier, Object messageOrSupplier) {
+    private static <T> T assertTimeoutPreemptively(Duration timeout, ThrowingSupplier<T> supplier, Object messageOrSupplier) {
         T[] arr = (T[]) new Object[1];
         try (ExecutorService pool = Executors.newSingleThreadExecutor()) {
             Future<Boolean> future = pool.submit(() -> {

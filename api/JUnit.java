@@ -1,34 +1,52 @@
 package api;
 
+import api.options.ActiveOptions;
+import api.options.JUnitOptions;
+import org.apache.commons.cli.*;
+
 import java.io.File;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.util.List;
 
 public class JUnit {
+    private static ActiveOptions activeOptions;
+    private static CommandLine commandLine;
+
     public static void main(String[] args) throws Exception {
-        createLoader(args[0]);
+        parseOptions(args);
+
+        if (activeOptions.selectPackage) {
+            String directory = commandLine.getOptionValue(JUnitOptions.SELECT_PACKAGE);
+            prepareDirectory(directory);
+            return;
+        }
+
+        List<String> argList = commandLine.getArgList();
+        processClasses(argList);
     }
 
-    private static void createLoader(String args) throws Exception {
-        try (URLClassLoader loader = createClassLoader(args)) {
-            File file = new File(args);
+    private static void parseOptions(String[] args) {
+        Options options = JUnitOptions.getOptions();
+        CommandLineParser parser = new DefaultParser();
+        try {
+            commandLine = parser.parse(options, args);
+            activeOptions = new ActiveOptions(commandLine);
+        } catch (ParseException e) {
+            System.out.println("Invalid Options");
+        }
+    }
+
+
+    private static void prepareDirectory(String dir) throws Exception {
+        try (URLClassLoader loader = createClassLoader(dir)) {
+            File file = new File(dir);
             File[] files = file.listFiles();
             if (files == null || files.length == 0)
                 return;
 
-            findTestClasses(loader, files);
-        }
-    }
-
-    private static void findTestClasses(URLClassLoader loader, File[] files) throws Exception {
-        for (File classFile : files) {
-            if (classFile.isFile())
-                if (classFile.isFile() && classFile.getName().endsWith(".java"))
-                    testClass(loader, classFile);
-
-            if (classFile.isDirectory())
-                createLoader(classFile.toString());
+            processDirectory(loader, files);
         }
     }
 
@@ -38,10 +56,31 @@ public class JUnit {
         return URLClassLoader.newInstance(urls);
     }
 
-    private static void testClass(URLClassLoader loader, File classFile) throws Exception {
+    private static void processDirectory(URLClassLoader loader, File[] files) throws Exception {
+        for (File classFile : files) {
+            if (classFile.isFile() && classFile.getName().endsWith(".class"))
+                processClass(loader, classFile);
+
+            if (classFile.isDirectory())
+                prepareDirectory(classFile.toString());
+        }
+    }
+
+    private static void processClasses(List<String> argList) throws Exception {
+        for (String clazz : argList) {
+            if (!clazz.endsWith(".class"))
+                return;
+
+            try (URLClassLoader loader = createClassLoader(clazz)) {
+                processClass(loader, new File(clazz));
+            }
+        }
+    }
+
+    private static void processClass(URLClassLoader loader, File classFile) throws Exception {
         String fileName = classFile.getName();
-        fileName = fileName.split(".java")[0];
-        Class<?> clazz = loader.loadClass("test." + fileName);
+        fileName = fileName.split(".class")[0];
+        Class<?> clazz = loader.loadClass(fileName);
         MethodExecutor methodExecutor = new MethodExecutor(clazz);
         methodExecutor.executeMethods();
     }

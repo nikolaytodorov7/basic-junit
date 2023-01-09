@@ -25,30 +25,26 @@ public class MethodExecutor {
 
     public void executeMethods() throws Exception {
         System.out.printf("| +-- %s\n", clazz.getSimpleName());
-
-        for (TestMethod method : beforeAllMethods) {
-            executeMethod(method);
-        }
-
-        for (TestMethod testMethod : testMethods) {
-            for (TestMethod method : beforeEachMethods) {
-                executeMethod(method);
-            }
-
-            executeMethod(testMethod);
-
-            for (TestMethod method : afterEachMethods) {
-                executeMethod(method);
-            }
-        }
-
-        for (TestMethod method : afterAllMethods) {
-            executeMethod(method);
-        }
-
+        executeAnnotationMethod(beforeAllMethods);
+        executeTestAnnotationMethod();
+        executeAnnotationMethod(afterAllMethods);
         System.out.printf("Failures(%d):\n", throwableList.size());
         for (Throwable t : throwableList)
             t.printStackTrace();
+    }
+
+    private void executeAnnotationMethod(List<TestMethod> methods) throws Exception {
+        for (TestMethod method : methods) {
+            executeMethod(method);
+        }
+    }
+
+    private void executeTestAnnotationMethod() throws Exception {
+        for (TestMethod testMethod : testMethods) {
+            executeAnnotationMethod(beforeEachMethods);
+            executeMethod(testMethod);
+            executeAnnotationMethod(afterEachMethods);
+        }
     }
 
     private void executeMethod(TestMethod method) throws Exception {

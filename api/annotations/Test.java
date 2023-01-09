@@ -10,7 +10,7 @@ import java.lang.annotation.Target;
 public @interface Test {
     long timeout() default -1;
 
-    Class<?> expected() default ExpectedDefaultClass.class;
+    Class<?> expected() default ExpectedDefaultExceptionClass.class;
 
     String[] dependsOnMethod() default {};
 }
